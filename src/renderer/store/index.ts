@@ -35,6 +35,7 @@ import { createTabSlice } from './slices/tabSlice';
 import { createTabUISlice } from './slices/tabUISlice';
 import {
   createTeamSlice,
+  evictStaleTeamSliceEntries,
   getLastResolvedTeamDataRefreshAt,
   isTeamDataRefreshPending,
   selectTeamDataForName,
@@ -90,6 +91,14 @@ const teamChangeEventDiagnostics = new Map<
 
 function noteTeamChangeEventBurst(teamName: string, eventType: string, visible: boolean): void {
   if (!visible) return;
+
+  // Evict stale diagnostic entries to prevent unbounded growth
+  if (teamChangeEventDiagnostics.size > 20) {
+    const now = Date.now();
+    for (const [key, diag] of teamChangeEventDiagnostics) {
+      if (now - diag.windowStartedAt > 60_000) teamChangeEventDiagnostics.delete(key);
+    }
+  }
 
   const now = Date.now();
   const diagnostic = teamChangeEventDiagnostics.get(teamName) ?? {
@@ -859,6 +868,21 @@ export function initializeNotificationListeners(): () => void {
 
   const teamIdleWatchdogTimer = setInterval(() => {
     void pollFocusedVisibleTeamIdleWatchdog();
+    // Evict stale team tracking entries
+    if (teamLastRelevantActivityAt.size > 20) {
+      const cutoff = Date.now() - 3_600_000; // 1 hour
+      for (const [key, ts] of teamLastRelevantActivityAt) {
+        if (ts < cutoff) {
+          teamLastRelevantActivityAt.delete(key);
+          teamLastIdleWatchdogRefreshAt.delete(key);
+        }
+      }
+    }
+    // Evict stale team slice module-level maps
+    const activeTeams = new Set((useStore.getState().teams ?? []).map((t) => t.teamName));
+    if (activeTeams.size > 0) {
+      evictStaleTeamSliceEntries(activeTeams);
+    }
   }, TEAM_VISIBLE_IDLE_WATCHDOG_POLL_MS);
   cleanupFns.push(() => {
     clearInterval(teamIdleWatchdogTimer);

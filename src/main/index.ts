@@ -425,6 +425,13 @@ let fileChangeCleanup: (() => void) | null = null;
 let todoChangeCleanup: (() => void) | null = null;
 let teamChangeCleanup: (() => void) | null = null;
 
+// Stored event listener references for proper cleanup
+let sshStateChangeHandler: ((status: unknown) => void) | null = null;
+let notifNewHandler: ((notification: unknown) => void) | null = null;
+let notifUpdatedHandler: ((data: unknown) => void) | null = null;
+let notifClickedSseHandler: ((data: unknown) => void) | null = null;
+let notifClickedWindowHandler: ((_error: unknown) => void) | null = null;
+
 /**
  * Resolve production renderer index path.
  * Main bundle lives in dist-electron/main, while renderer lives in out/renderer.
@@ -1001,21 +1008,25 @@ async function initializeServices(): Promise<void> {
   registerRecentProjectsIpc(ipcMain, recentProjectsFeature);
 
   // Forward SSH state changes to renderer and HTTP SSE clients
-  sshConnectionManager.on('state-change', (status: unknown) => {
+  sshStateChangeHandler = (status: unknown) => {
     safeSendToRenderer(mainWindow, SSH_STATUS, status);
     httpServer.broadcast('ssh:status', status);
-  });
+  };
+  sshConnectionManager.on('state-change', sshStateChangeHandler);
 
   // Forward notification events to HTTP SSE clients
-  notificationManager.on('notification-new', (notification: unknown) => {
+  notifNewHandler = (notification: unknown) => {
     httpServer.broadcast('notification:new', notification);
-  });
-  notificationManager.on('notification-updated', (data: unknown) => {
+  };
+  notifUpdatedHandler = (data: unknown) => {
     httpServer.broadcast('notification:updated', data);
-  });
-  notificationManager.on('notification-clicked', (data: unknown) => {
+  };
+  notifClickedSseHandler = (data: unknown) => {
     httpServer.broadcast('notification:clicked', data);
-  });
+  };
+  notificationManager.on('notification-new', notifNewHandler);
+  notificationManager.on('notification-updated', notifUpdatedHandler);
+  notificationManager.on('notification-clicked', notifClickedSseHandler);
 
   // Start HTTP server if enabled in config
   const appConfig = configManager.getConfig();
@@ -1143,6 +1154,38 @@ function shutdownServices(): void {
 
   // Dispose backup service timers
   teamBackupService?.dispose();
+
+  // Clear pending inbox notification debounce timers
+  for (const timer of inboxNotifyTimers.values()) {
+    clearTimeout(timer);
+  }
+  inboxNotifyTimers.clear();
+  inboxMessageCounts.clear();
+  sentMessageCounts.clear();
+  teamDisplayNameCache.clear();
+  teamListInFlight = null;
+
+  // Remove stored event listeners from sshConnectionManager and notificationManager
+  if (sshStateChangeHandler) {
+    sshConnectionManager?.off('state-change', sshStateChangeHandler);
+    sshStateChangeHandler = null;
+  }
+  if (notifNewHandler) {
+    notificationManager?.off('notification-new', notifNewHandler);
+    notifNewHandler = null;
+  }
+  if (notifUpdatedHandler) {
+    notificationManager?.off('notification-updated', notifUpdatedHandler);
+    notifUpdatedHandler = null;
+  }
+  if (notifClickedSseHandler) {
+    notificationManager?.off('notification-clicked', notifClickedSseHandler);
+    notifClickedSseHandler = null;
+  }
+  if (notifClickedWindowHandler) {
+    notificationManager?.off('notification-clicked', notifClickedWindowHandler);
+    notifClickedWindowHandler = null;
+  }
 
   logger.info('Services shut down successfully');
 }
@@ -1502,12 +1545,13 @@ void app.whenReady().then(async () => {
     createWindow();
 
     // Listen for notification click events
-    notificationManager.on('notification-clicked', (_error) => {
+    notifClickedWindowHandler = (_error: unknown) => {
       if (mainWindow) {
         mainWindow.show();
         mainWindow.focus();
       }
-    });
+    };
+    notificationManager.on('notification-clicked', notifClickedWindowHandler);
   } catch (error) {
     logger.error('Startup initialization failed:', error);
     if (!mainWindow) {

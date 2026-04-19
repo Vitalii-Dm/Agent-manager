@@ -746,6 +746,10 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
   // Clean up per-tab session data when tab is closed
   cleanupTabSessionData: (tabId: string) => {
     tabFetchGeneration.delete(tabId);
+    // Prevent unbounded growth of session refresh tracking maps
+    if (sessionRefreshGeneration.size > 100) sessionRefreshGeneration.clear();
+    if (sessionRefreshInFlight.size > 50) sessionRefreshInFlight.clear();
+    if (sessionRefreshQueued.size > 50) sessionRefreshQueued.clear();
     const prev = get().tabSessionData;
     if (!(tabId in prev)) return;
     const next = { ...prev };

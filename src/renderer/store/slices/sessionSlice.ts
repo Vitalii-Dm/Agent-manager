@@ -254,6 +254,7 @@ export const createSessionSlice: StateCreator<AppState, [], [], SessionSlice> = 
       return;
     }
 
+    if (projectRefreshGeneration.size > 50) projectRefreshGeneration.clear();
     const generation = (projectRefreshGeneration.get(projectId) ?? 0) + 1;
     projectRefreshGeneration.set(projectId, generation);
 
