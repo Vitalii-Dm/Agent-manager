@@ -30,6 +30,10 @@ const sessionRefreshQueued = new Set<string>();
  */
 const tabFetchGeneration = new Map<string, number>();
 
+/** Maximum number of tabs that keep full session data in memory. */
+const MAX_LOADED_TABS = 3;
+const tabLastAccessAt = new Map<string, number>();
+
 function incrementTabGeneration(tabId?: string): number {
   const key = tabId ?? '__global__';
   const gen = (tabFetchGeneration.get(key) ?? 0) + 1;
@@ -135,6 +139,35 @@ export interface SessionDetailSlice {
   cleanupTabSessionData: (tabId: string) => void;
 }
 
+function evictInactiveTabData(
+  tabSessionData: Record<string, TabSessionData>,
+  activeTabId?: string
+): Record<string, TabSessionData> {
+  const tabIds = Object.keys(tabSessionData);
+  if (tabIds.length <= MAX_LOADED_TABS) return tabSessionData;
+  const sorted = tabIds
+    .filter((id) => id !== activeTabId)
+    .sort((a, b) => (tabLastAccessAt.get(b) ?? 0) - (tabLastAccessAt.get(a) ?? 0));
+  const toEvict = sorted.slice(MAX_LOADED_TABS - 1);
+  if (toEvict.length === 0) return tabSessionData;
+  const next = { ...tabSessionData };
+  for (const id of toEvict) {
+    const tab = next[id];
+    if (tab && (tab.sessionDetail || tab.conversation)) {
+      next[id] = {
+        ...tab,
+        sessionDetail: null,
+        conversation: null,
+        sessionClaudeMdStats: null,
+        sessionContextStats: null,
+        sessionPhaseInfo: null,
+        selectedAIGroup: null,
+      };
+    }
+  }
+  return next;
+}
+
 // =============================================================================
 // Slice Creator
 // =============================================================================
@@ -174,6 +207,7 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
     options?: { silent?: boolean }
   ) => {
     const requestGeneration = incrementTabGeneration(tabId);
+    if (tabId) tabLastAccessAt.set(tabId, Date.now());
     if (!options?.silent) {
       set({
         sessionDetailLoading: true,
@@ -453,6 +487,12 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
         });
       }
 
+      // Evict inactive tab data to bound memory
+      const evicted = evictInactiveTabData(get().tabSessionData, tabId);
+      if (evicted !== get().tabSessionData) {
+        set({ tabSessionData: evicted });
+      }
+
       // Only update global state if still viewing this session
       const activeTab = currentState.getActiveTab();
       const stillViewingSession =
@@ -677,6 +717,12 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
         }
       }
       set({ tabSessionData: latestTabSessionData });
+
+      // Evict inactive tab data to maintain memory cap
+      const afterEviction = evictInactiveTabData(get().tabSessionData);
+      if (afterEviction !== get().tabSessionData) {
+        set({ tabSessionData: afterEviction });
+      }
     } catch (error) {
       logger.error('refreshSessionInPlace error:', error);
       // Don't set error state - this is a background refresh
@@ -714,6 +760,7 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
 
   // Set visible AI Group for a specific tab
   setTabVisibleAIGroup: (tabId: string, aiGroupId: string | null) => {
+    tabLastAccessAt.set(tabId, Date.now());
     const state = get();
     const tabData = state.tabSessionData[tabId];
     if (!tabData) return;
@@ -746,6 +793,7 @@ export const createSessionDetailSlice: StateCreator<AppState, [], [], SessionDet
   // Clean up per-tab session data when tab is closed
   cleanupTabSessionData: (tabId: string) => {
     tabFetchGeneration.delete(tabId);
+    tabLastAccessAt.delete(tabId);
     // Prevent unbounded growth of session refresh tracking maps
     if (sessionRefreshGeneration.size > 100) sessionRefreshGeneration.clear();
     if (sessionRefreshInFlight.size > 50) sessionRefreshInFlight.clear();
