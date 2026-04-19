@@ -121,6 +121,22 @@ export function __resetTeamSliceModuleStateForTests(): void {
   memberSpawnUiEqualLastWarnAtByTeam.clear();
 }
 
+/** Evict stale entries from module-level tracking maps (production use). */
+export function evictStaleTeamSliceEntries(activeTeamNames: Set<string>): void {
+  for (const key of lastResolvedTeamDataRefreshAtByTeam.keys()) {
+    if (!activeTeamNames.has(key)) lastResolvedTeamDataRefreshAtByTeam.delete(key);
+  }
+  for (const key of memberSpawnStatusesIpcBackoffUntilByTeam.keys()) {
+    if (!activeTeamNames.has(key)) memberSpawnStatusesIpcBackoffUntilByTeam.delete(key);
+  }
+  for (const key of teamRefreshBurstDiagnostics.keys()) {
+    if (!activeTeamNames.has(key)) teamRefreshBurstDiagnostics.delete(key);
+  }
+  for (const key of memberSpawnUiEqualLastWarnAtByTeam.keys()) {
+    if (!activeTeamNames.has(key)) memberSpawnUiEqualLastWarnAtByTeam.delete(key);
+  }
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -2372,16 +2388,26 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
           }
         : data;
       const setStartedAt = performance.now();
-      set((state) => ({
-        selectedTeamName: teamName,
-        selectedTeamData: nextTeamData,
-        teamDataCacheByName: {
-          ...state.teamDataCacheByName,
-          [teamName]: nextTeamData,
-        },
-        selectedTeamLoading: false,
-        selectedTeamError: null,
-      }));
+      set((state) => {
+        // Evict oldest cache entry when exceeding 5 — keep most recent teams
+        const existingKeys = Object.keys(state.teamDataCacheByName);
+        let baseCache = { ...state.teamDataCacheByName };
+        if (existingKeys.length >= 5 && !existingKeys.includes(teamName)) {
+          // Remove the first (oldest-inserted) key that isn't the current team
+          const toEvict = existingKeys.find((k) => k !== teamName);
+          if (toEvict) delete baseCache[toEvict];
+        }
+        return {
+          selectedTeamName: teamName,
+          selectedTeamData: nextTeamData,
+          teamDataCacheByName: {
+            ...baseCache,
+            [teamName]: nextTeamData,
+          },
+          selectedTeamLoading: false,
+          selectedTeamError: null,
+        };
+      });
       lastResolvedTeamDataRefreshAtByTeam.set(teamName, Date.now());
       const setMs = performance.now() - setStartedAt;
       const postStartedAt = performance.now();
