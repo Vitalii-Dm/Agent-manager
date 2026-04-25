@@ -105,6 +105,18 @@ export const DashboardSection = (): React.JSX.Element => {
     }
   }, [teamName, fetchDeletedTasks]);
 
+  // Listen for global events dispatched from the TopRail, HeroSection, and CommandBar.
+  useEffect(() => {
+    const onCreateTeam = (): void => setCreateTeamOpen(true);
+    const onCreateTask = (): void => setCreateTaskOpen(true);
+    window.addEventListener('aurora:create-team', onCreateTeam);
+    window.addEventListener('aurora:create-task', onCreateTask);
+    return () => {
+      window.removeEventListener('aurora:create-team', onCreateTeam);
+      window.removeEventListener('aurora:create-task', onCreateTask);
+    };
+  }, []);
+
   const electronMode = isElectronMode();
   const canCreate = electronMode && connectionMode === 'local';
   const existingTeamNames = useMemo(() => teams.map((t) => t.teamName), [teams]);

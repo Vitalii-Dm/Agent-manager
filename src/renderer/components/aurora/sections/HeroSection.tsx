@@ -1,11 +1,12 @@
-import React, { useRef } from 'react';
-import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
 
 import { scrollToAnchor } from '@renderer/lib/lenis';
+import { useStore } from '@renderer/store';
+import type { TeamSummary } from '@shared/types/team';
 
 import { LiquidGlass } from '../LiquidGlass';
 import { LivePreviewStrip } from '../LivePreviewStrip';
-import { useAuroraTeam } from '../hooks/useAuroraTeam';
 
 const APPLE_EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -16,8 +17,9 @@ const APPLE_EASE = [0.22, 1, 0.36, 1] as const;
 export const HeroSection = (): React.JSX.Element => {
   const reduceMotion = useReducedMotion();
   const sectionRef = useRef<HTMLElement | null>(null);
-  const { teamName } = useAuroraTeam();
-  const hasTeam = teamName !== null;
+  const allTeams = useStore((s) => s.teams);
+  const teams = useMemo(() => allTeams.filter((t) => !t.deletedAt), [allTeams]);
+  const selectTeam = useStore((s) => s.selectTeam);
 
   // Scroll-linked transforms — title scales down, body fades, preview strip
   // parallaxes upward as the hero leaves the viewport. All driven by the
@@ -89,7 +91,7 @@ export const HeroSection = (): React.JSX.Element => {
           transition={{ duration: 0.6, ease: APPLE_EASE, delay: 0.4 }}
           className="mt-10 flex flex-wrap items-center gap-3"
         >
-          <PrimaryCta hasTeam={hasTeam} />
+          <PrimaryCta teams={teams} onSelectTeam={selectTeam} />
           <SecondaryCta />
         </motion.div>
 
@@ -151,43 +153,154 @@ const SheenWord = ({ word, delay = 0 }: SheenWordProps): React.JSX.Element => {
 };
 
 interface PrimaryCtaProps {
-  hasTeam: boolean;
+  teams: TeamSummary[];
+  onSelectTeam: (teamName: string) => Promise<void>;
 }
 
-const PrimaryCta = ({ hasTeam }: PrimaryCtaProps): React.JSX.Element => (
-  <button
-    type="button"
-    onClick={() => {
-      if (hasTeam) {
-        scrollToAnchor('#dashboard');
-      } else {
-        window.dispatchEvent(new CustomEvent('aurora:create-team'));
+const PrimaryCta = ({ teams, onSelectTeam }: PrimaryCtaProps): React.JSX.Element => {
+  const [showPicker, setShowPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const reduceMotion = useReducedMotion();
+
+  // Dismiss picker on outside click
+  useEffect(() => {
+    if (!showPicker) return;
+    const handler = (e: MouseEvent): void => {
+      if (
+        pickerRef.current &&
+        !pickerRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
+        setShowPicker(false);
       }
-    }}
-    className="group relative inline-flex h-12 items-center gap-2 overflow-hidden rounded-full px-6 text-[14px] font-medium text-white transition-transform duration-300 will-change-transform hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg-base)]"
-    style={{
-      background: 'linear-gradient(135deg, var(--a-violet) 0%, var(--a-cyan) 100%)',
-      boxShadow:
-        '0 14px 38px -14px rgba(124, 92, 255, 0.55), 0 4px 12px -4px rgba(61, 198, 255, 0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
-    }}
-  >
-    <span className="relative z-10">{hasTeam ? 'Go to dashboard' : 'Create your first team'}</span>
-    <span
-      aria-hidden="true"
-      className="relative z-10 text-white/80 transition-transform duration-300 group-hover:translate-x-[2px]"
-    >
-      →
-    </span>
-    <span
-      aria-hidden="true"
-      className="absolute inset-0 -translate-x-full transition-transform duration-700 ease-out group-hover:translate-x-full"
-      style={{
-        background:
-          'linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)',
-      }}
-    />
-  </button>
-);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showPicker]);
+
+  const handleClick = (): void => {
+    if (teams.length === 0) {
+      window.dispatchEvent(new CustomEvent('aurora:create-team'));
+    } else {
+      setShowPicker((v) => !v);
+    }
+  };
+
+  const handleSelectTeam = (teamName: string): void => {
+    setShowPicker(false);
+    void onSelectTeam(teamName).then(() => {
+      scrollToAnchor('#dashboard');
+    });
+  };
+
+  const handleCreateNew = (): void => {
+    setShowPicker(false);
+    window.dispatchEvent(new CustomEvent('aurora:create-team'));
+  };
+
+  const label = teams.length > 0 ? 'Get started' : 'Create your first team';
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={handleClick}
+        className="group relative inline-flex h-12 items-center gap-2 overflow-hidden rounded-full px-6 text-[14px] font-medium text-white transition-transform duration-300 will-change-transform hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg-base)]"
+        style={{
+          background: 'linear-gradient(135deg, var(--a-violet) 0%, var(--a-cyan) 100%)',
+          boxShadow:
+            '0 14px 38px -14px rgba(124, 92, 255, 0.55), 0 4px 12px -4px rgba(61, 198, 255, 0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
+        }}
+      >
+        <span className="relative z-10">{label}</span>
+        <span
+          aria-hidden="true"
+          className="relative z-10 text-white/80 transition-transform duration-300 group-hover:translate-x-[2px]"
+        >
+          →
+        </span>
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 -translate-x-full transition-transform duration-700 ease-out group-hover:translate-x-full"
+          style={{
+            background:
+              'linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)',
+          }}
+        />
+      </button>
+
+      <AnimatePresence>
+        {showPicker && (
+          <motion.div
+            ref={pickerRef}
+            initial={reduceMotion ? false : { opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: APPLE_EASE }}
+            className="absolute left-0 top-full z-50 mt-2 w-72"
+          >
+            <LiquidGlass radius={20} shadow="lifted" className="flex flex-col overflow-hidden p-2">
+              <p className="px-3 pb-1.5 pt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--ink-3)]">
+                Choose a team
+              </p>
+
+              <ul className="flex flex-col gap-1">
+                {teams.map((team) => {
+                  const isRunning = team.teamLaunchState === 'clean_success';
+                  return (
+                    <li key={team.teamName}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTeam(team.teamName)}
+                        className="flex w-full items-center gap-3 rounded-[12px] border border-white/55 bg-white/55 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)]"
+                        style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }}
+                      >
+                        <span
+                          className="inline-flex h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: isRunning ? 'var(--ok)' : 'var(--ink-4)' }}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] font-medium text-[color:var(--ink-1)]">
+                            {team.displayName || team.teamName}
+                          </span>
+                          <span className="block text-[11px] text-[color:var(--ink-3)]">
+                            {team.memberCount} {team.memberCount === 1 ? 'agent' : 'agents'}
+                            {isRunning ? ' · live' : ''}
+                          </span>
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className="text-[color:var(--ink-3)] transition-transform duration-200 group-hover:translate-x-0.5"
+                        >
+                          →
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="mt-1.5 border-t border-[color:var(--glass-shade)] pt-1.5">
+                <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-[12px] font-medium text-[color:var(--ink-2)] transition-colors hover:bg-white/50 hover:text-[color:var(--ink-1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)]"
+                >
+                  <span className="text-[16px] leading-none">+</span>
+                  <span>Create new team</span>
+                </button>
+              </div>
+            </LiquidGlass>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const SecondaryCta = (): React.JSX.Element => (
   <LiquidGlass

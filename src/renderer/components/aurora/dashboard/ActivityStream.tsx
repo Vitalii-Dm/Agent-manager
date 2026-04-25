@@ -99,7 +99,16 @@ const ActivityRow = ({ event }: { event: SeedEvent }): React.JSX.Element => {
   const role = inferMascotRole(event.from);
   return (
     <div
-      className="flex items-start gap-3 rounded-[14px] border border-white/55 bg-white/55 px-3 py-2 transition-colors duration-200 hover:bg-white/70"
+      role="button"
+      tabIndex={0}
+      onClick={() => window.dispatchEvent(new CustomEvent('aurora:open-chat'))}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('aurora:open-chat'));
+        }
+      }}
+      className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-white/55 bg-white/55 px-3 py-2 transition-colors duration-200 hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)]"
       style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }}
     >
       <Mascot role={role} size={32} seed={event.from} />

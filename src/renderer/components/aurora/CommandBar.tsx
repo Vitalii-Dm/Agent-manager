@@ -93,25 +93,37 @@ export const CommandBar = (): React.JSX.Element => {
         id: 'create-agent',
         label: 'Create a new agent',
         group: 'Agents',
-        perform: () => setOpen(false),
+        perform: () => {
+          setOpen(false);
+          window.dispatchEvent(new CustomEvent('aurora:create-team'));
+        },
       },
       {
         id: 'message-lead',
         label: 'Message the lead',
         group: 'Agents',
-        perform: () => setOpen(false),
+        perform: () => {
+          setOpen(false);
+          window.dispatchEvent(new CustomEvent('aurora:open-chat'));
+        },
       },
       {
         id: 'message-coder',
         label: 'Message the coder',
         group: 'Agents',
-        perform: () => setOpen(false),
+        perform: () => {
+          setOpen(false);
+          window.dispatchEvent(new CustomEvent('aurora:open-chat'));
+        },
       },
       {
         id: 'message-reviewer',
         label: 'Message the reviewer',
         group: 'Agents',
-        perform: () => setOpen(false),
+        perform: () => {
+          setOpen(false);
+          window.dispatchEvent(new CustomEvent('aurora:open-chat'));
+        },
       },
       { id: 'toggle-theme', label: 'Toggle theme', group: 'System', perform: toggleTheme },
     ],
