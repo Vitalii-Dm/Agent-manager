@@ -77,6 +77,7 @@ import {
   BoardTaskExactLogsService,
   BoardTaskLogStreamService,
   BranchStatusService,
+  CliInstallerService,
   configManager,
   LocalFileSystemProvider,
   MemberStatsComputer,
@@ -748,8 +749,9 @@ async function initializeServices(): Promise<void> {
   // Wire file watcher events for local context
   wireFileWatcherEvents(localContext);
 
-  // Initialize updater service
+  // Initialize updater and CLI installer services
   updaterService = new UpdaterService();
+  const cliInstallerService = new CliInstallerService();
   const teamMemberLogsFinder = new TeamMemberLogsFinder();
   const boardTaskActivityRecordSource = new BoardTaskActivityRecordSource();
   const boardTaskActivityService = new BoardTaskActivityService(boardTaskActivityRecordSource);
@@ -875,6 +877,7 @@ async function initializeServices(): Promise<void> {
       httpServer,
       startHttpServer: () => startHttpServer(handleModeSwitch),
     },
+    cliInstallerService,
     crossTeamService,
     teamBackupService ?? undefined
   );

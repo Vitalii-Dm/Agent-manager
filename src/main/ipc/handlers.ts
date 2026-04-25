@@ -1,6 +1,11 @@
 import { createLogger } from '@shared/utils/logger';
 import { ipcMain } from 'electron';
 
+import {
+  initializeCliInstallerHandlers,
+  registerCliInstallerHandlers,
+  removeCliInstallerHandlers,
+} from './cliInstaller';
 import { initializeConfigHandlers, registerConfigHandlers, removeConfigHandlers } from './config';
 import {
   initializeContextHandlers,
@@ -45,6 +50,7 @@ import type {
   BoardTaskExactLogsService,
   BoardTaskLogStreamService,
   BranchStatusService,
+  CliInstallerService,
   MemberStatsComputer,
   ServiceContext,
   ServiceContextRegistry,
@@ -83,6 +89,7 @@ export function initializeIpcHandlers(
     httpServer: HttpServer;
     startHttpServer: () => Promise<void>;
   },
+  cliInstaller?: CliInstallerService,
   crossTeamService?: CrossTeamService,
   teamBackupService?: TeamBackupService
 ): void {
@@ -114,6 +121,9 @@ export function initializeIpcHandlers(
   if (httpServerDeps) {
     initializeHttpServerHandlers(httpServerDeps.httpServer, httpServerDeps.startHttpServer);
   }
+  if (cliInstaller) {
+    initializeCliInstallerHandlers(cliInstaller);
+  }
   if (crossTeamService) {
     initializeCrossTeamHandlers(crossTeamService);
   }
@@ -130,6 +140,9 @@ export function initializeIpcHandlers(
   registerWindowHandlers(ipcMain);
   if (httpServerDeps) {
     registerHttpServerHandlers(ipcMain);
+  }
+  if (cliInstaller) {
+    registerCliInstallerHandlers(ipcMain);
   }
   if (crossTeamService) {
     registerCrossTeamHandlers(ipcMain);
@@ -149,6 +162,7 @@ export function removeIpcHandlers(): void {
   removeContextHandlers(ipcMain);
   removeTeamHandlers(ipcMain);
   removeWindowHandlers(ipcMain);
+  removeCliInstallerHandlers(ipcMain);
   removeHttpServerHandlers(ipcMain);
   removeCrossTeamHandlers(ipcMain);
 
