@@ -336,20 +336,6 @@ export const KanbanTaskCard = memo(
               {REVIEW_STATE_DISPLAY.needsFix.label}
             </span>
           ) : null}
-          {task.loopEnabled ? (
-            <span
-              className={`mt-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                task.loopStoppedByUser
-                  ? 'bg-gray-500/15 text-gray-500'
-                  : 'bg-purple-500/15 text-purple-700 dark:text-purple-400'
-              }`}
-            >
-              <RotateCcw size={10} />
-              {task.loopStoppedByUser
-                ? 'Loop stopped'
-                : `Loop${task.loopCurrentIteration ? ` ${task.loopCurrentIteration}` : ''}${task.loopMaxIterations ? `/${task.loopMaxIterations}` : ''}`}
-            </span>
-          ) : null}
           {compact && <TruncatedTitle text={task.subject} className="mt-1" />}
         </div>
 

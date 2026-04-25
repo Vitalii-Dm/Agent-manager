@@ -600,13 +600,6 @@ function wireFileWatcherEvents(context: ServiceContext): void {
               `[FileWatcher] task comment notify failed for ${teamName}#${taskId}: ${String(e)}`
             )
           );
-        void teamDataService
-          .maybeRestartLoopTask(teamName, taskId)
-          .catch((e: unknown) =>
-            logger.warn(
-              `[FileWatcher] loop restart failed for ${teamName}#${taskId}: ${String(e)}`
-            )
-          );
 
         // Schedule debounced backup for changed task file
         if (teamBackupService) {

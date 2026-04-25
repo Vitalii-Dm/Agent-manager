@@ -373,9 +373,6 @@ export const TEAM_MEMBER_SPAWN_STATUSES = 'team:memberSpawnStatuses';
 /** Soft-delete a task (set status to 'deleted' with deletedAt timestamp) */
 export const TEAM_SOFT_DELETE_TASK = 'team:softDeleteTask';
 
-/** Stop the loop on a looping task */
-export const TEAM_STOP_TASK_LOOP = 'team:stopTaskLoop';
-
 /** Get all soft-deleted tasks for a team */
 export const TEAM_GET_DELETED_TASKS = 'team:getDeletedTasks';
 

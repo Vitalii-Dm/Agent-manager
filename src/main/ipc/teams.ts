@@ -63,7 +63,6 @@ import {
   TEAM_START_TASK,
   TEAM_START_TASK_BY_USER,
   TEAM_STOP,
-  TEAM_STOP_TASK_LOOP,
   TEAM_TOOL_APPROVAL_READ_FILE,
   TEAM_TOOL_APPROVAL_RESPOND,
   TEAM_TOOL_APPROVAL_SETTINGS,
@@ -518,7 +517,6 @@ export function registerTeamHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(TEAM_TOOL_APPROVAL_SETTINGS, handleToolApprovalSettings);
   ipcMain.handle(TEAM_GET_SAVED_REQUEST, handleGetSavedRequest);
   ipcMain.handle(TEAM_DELETE_DRAFT, handleDeleteDraft);
-  ipcMain.handle(TEAM_STOP_TASK_LOOP, handleStopTaskLoop);
   logger.info('Team handlers registered');
 }
 
@@ -591,7 +589,6 @@ export function removeTeamHandlers(ipcMain: IpcMain): void {
   ipcMain.removeHandler(TEAM_TOOL_APPROVAL_SETTINGS);
   ipcMain.removeHandler(TEAM_GET_SAVED_REQUEST);
   ipcMain.removeHandler(TEAM_DELETE_DRAFT);
-  ipcMain.removeHandler(TEAM_STOP_TASK_LOOP);
 }
 
 function getTeamDataService(): TeamDataService {
@@ -2089,8 +2086,6 @@ async function handleCreateTask(
       prompt: payload.prompt?.trim() || undefined,
       promptTaskRefs: validatedPromptTaskRefs.value,
       startImmediately: payload.startImmediately,
-      loopEnabled: payload.loopEnabled === true ? true : undefined,
-      loopMaxIterations: typeof payload.loopMaxIterations === 'number' && payload.loopMaxIterations > 0 ? payload.loopMaxIterations : undefined,
     })
   );
 }
@@ -2208,24 +2203,6 @@ async function handleUpdateTaskStatus(
       validatedTaskId.value!,
       status as TeamTaskStatus
     )
-  );
-}
-
-async function handleStopTaskLoop(
-  _event: IpcMainInvokeEvent,
-  teamName: unknown,
-  taskId: unknown
-): Promise<IpcResult<void>> {
-  const validatedTeamName = validateTeamName(teamName);
-  if (!validatedTeamName.valid) {
-    return { success: false, error: validatedTeamName.error ?? 'Invalid teamName' };
-  }
-  const validatedTaskId = validateTaskId(taskId);
-  if (!validatedTaskId.valid) {
-    return { success: false, error: validatedTaskId.error ?? 'Invalid taskId' };
-  }
-  return wrapTeamHandler('stopTaskLoop', () =>
-    getTeamDataService().stopTaskLoop(validatedTeamName.value!, validatedTaskId.value!)
   );
 }
 

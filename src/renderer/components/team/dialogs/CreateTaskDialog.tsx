@@ -57,9 +57,7 @@ interface CreateTaskDialogProps {
     prompt?: string,
     startImmediately?: boolean,
     descriptionTaskRefs?: TaskRef[],
-    promptTaskRefs?: TaskRef[],
-    loopEnabled?: boolean,
-    loopMaxIterations?: number
+    promptTaskRefs?: TaskRef[]
   ) => void;
   submitting?: boolean;
 }
@@ -98,8 +96,6 @@ export const CreateTaskDialog = ({
   const [blockedBySearch, setBlockedBySearch] = useState('');
   const [relatedSearch, setRelatedSearch] = useState('');
   const [showOptionalFields, setShowOptionalFields] = useState(false);
-  const [loopEnabled, setLoopEnabled] = useState(false);
-  const [loopMaxIterations, setLoopMaxIterations] = useState<number | undefined>(undefined);
   const prevOpenRef = useRef(false);
 
   // Reset form when dialog opens (avoid setState during render)
@@ -190,9 +186,7 @@ export const CreateTaskDialog = ({
       trimmedPrompt || undefined,
       startImmediately,
       descriptionTaskRefs,
-      promptTaskRefs,
-      loopEnabled || undefined,
-      loopEnabled ? loopMaxIterations : undefined
+      promptTaskRefs
     );
     descriptionDraft.clearDraft();
     descChipDraft.clearChipDraft();
@@ -483,42 +477,6 @@ export const CreateTaskDialog = ({
               ) : null}
             </div>
           ) : null}
-
-          {/* Loop until satisfied */}
-          <div className="grid gap-1">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="task-loop-enabled"
-                checked={loopEnabled}
-                onCheckedChange={(v) => setLoopEnabled(v === true)}
-              />
-              <Label htmlFor="task-loop-enabled" className="text-xs font-normal">
-                Loop until satisfied
-              </Label>
-            </div>
-            {loopEnabled && (
-              <div className="mt-1 flex items-center gap-2 pl-6">
-                <Label htmlFor="task-loop-max" className="shrink-0 text-[11px] text-[var(--color-text-muted)]">
-                  Max iterations
-                </Label>
-                <input
-                  id="task-loop-max"
-                  type="number"
-                  min={1}
-                  placeholder="unlimited"
-                  value={loopMaxIterations ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value.trim();
-                    setLoopMaxIterations(val ? Math.max(1, parseInt(val, 10) || 1) : undefined);
-                  }}
-                  className="h-7 w-24 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-[var(--color-text)]"
-                />
-              </div>
-            )}
-            <p className="text-[10px] text-[var(--color-text-muted)]">
-              Task will auto-restart when the agent completes it
-            </p>
-          </div>
         </div>
 
         <DialogFooter>

@@ -167,7 +167,6 @@ import {
   TEAM_START_TASK,
   TEAM_START_TASK_BY_USER,
   TEAM_STOP,
-  TEAM_STOP_TASK_LOOP,
   TEAM_TOOL_APPROVAL_EVENT,
   TEAM_TOOL_APPROVAL_READ_FILE,
   TEAM_TOOL_APPROVAL_RESPOND,
@@ -1059,9 +1058,6 @@ const electronAPI: ElectronAPI = {
     },
     softDeleteTask: async (teamName: string, taskId: string) => {
       return invokeIpcWithResult<void>(TEAM_SOFT_DELETE_TASK, teamName, taskId);
-    },
-    stopTaskLoop: async (teamName: string, taskId: string) => {
-      return invokeIpcWithResult<void>(TEAM_STOP_TASK_LOOP, teamName, taskId);
     },
     restoreTask: async (teamName: string, taskId: string) => {
       return invokeIpcWithResult<void>(TEAM_RESTORE_TASK, teamName, taskId);

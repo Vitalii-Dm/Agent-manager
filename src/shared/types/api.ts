@@ -530,7 +530,6 @@ export interface TeamsAPI {
   getLeadContext: (teamName: string) => Promise<LeadContextUsageSnapshot>;
   getMemberSpawnStatuses: (teamName: string) => Promise<MemberSpawnStatusesSnapshot>;
   softDeleteTask: (teamName: string, taskId: string) => Promise<void>;
-  stopTaskLoop: (teamName: string, taskId: string) => Promise<void>;
   restoreTask: (teamName: string, taskId: string) => Promise<void>;
   getDeletedTasks: (teamName: string) => Promise<TeamTask[]>;
   showMessageNotification: (data: TeamMessageNotificationData) => Promise<void>;

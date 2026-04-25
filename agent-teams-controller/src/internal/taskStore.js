@@ -347,10 +347,6 @@ function createTask(paths, input = {}) {
     ...(input.sourceMessage && typeof input.sourceMessage === 'object'
       ? { sourceMessage: input.sourceMessage }
       : {}),
-    ...(input.loopEnabled === true ? { loopEnabled: true } : {}),
-    ...(typeof input.loopMaxIterations === 'number' && input.loopMaxIterations > 0
-      ? { loopMaxIterations: input.loopMaxIterations }
-      : {}),
   });
 
   if (!task.subject) {

@@ -443,14 +443,6 @@ export interface TeamTask {
   sourceMessageId?: string;
   /** Snapshot of the source message at creation time (sanitized, no blobs). */
   sourceMessage?: SourceMessageSnapshot;
-  /** Whether this task should auto-restart when the agent completes it. */
-  loopEnabled?: boolean;
-  /** Maximum number of loop iterations (undefined = unlimited). */
-  loopMaxIterations?: number;
-  /** Current loop iteration counter (starts at 1 on first restart). */
-  loopCurrentIteration?: number;
-  /** Set to true when user manually stops the loop. */
-  loopStoppedByUser?: boolean;
 }
 
 /** Task enriched for UI/DTO use (overlay from kanban-state.json). */
@@ -785,8 +777,6 @@ export interface CreateTaskRequest {
   prompt?: string;
   promptTaskRefs?: TaskRef[];
   startImmediately?: boolean;
-  loopEnabled?: boolean;
-  loopMaxIterations?: number;
 }
 
 export type LeadActivityState = 'active' | 'idle' | 'offline';

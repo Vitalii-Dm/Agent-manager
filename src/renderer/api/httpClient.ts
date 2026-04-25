@@ -988,7 +988,6 @@ export class HttpAPIClient implements ElectronAPI {
     readFileForToolApproval: async () => {
       throw new Error('Tool approval file read not available in browser mode');
     },
-    stopTaskLoop: async () => {},
   };
 
   // Cross-team communication API stubs

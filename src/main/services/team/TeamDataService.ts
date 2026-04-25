@@ -157,8 +157,6 @@ export class TeamDataService {
   private processHealthTeams = new Set<string>();
   /** Tracks notified task-start transitions to avoid duplicate lead notifications. */
   private notifiedTaskStarts = new Set<string>();
-  /** Tracks loop restart dedup keys to prevent double-restart from rapid file watcher events. */
-  private loopRestartDedup = new Set<string>();
   private taskCommentNotificationInitialization: Promise<void> | null = null;
   private taskCommentNotificationInFlight = new Set<string>();
   private taskChangePresenceRepository: TaskChangePresenceRepository | null = null;
@@ -1709,56 +1707,6 @@ export class TeamDataService {
     actor?: string
   ): Promise<void> {
     this.getController(teamName).tasks.setTaskStatus(taskId, status, actor);
-  }
-
-  /**
-   * Auto-restart a completed loop task. Called from the file watcher on task changes.
-   * No-op if the task is not a loop task, not completed, already stopped, or at max iterations.
-   */
-  async maybeRestartLoopTask(teamName: string, taskId: string): Promise<void> {
-    try {
-      const tasks = await this.taskReader.getTasks(teamName);
-      const task = tasks.find((t) => t.id === taskId);
-      if (!task) return;
-      if (task.status !== 'completed') return;
-      if (!task.loopEnabled) return;
-      if (task.loopStoppedByUser) return;
-
-      const currentIteration = task.loopCurrentIteration ?? 0;
-      if (task.loopMaxIterations != null && currentIteration >= task.loopMaxIterations) return;
-      if (!task.owner) return;
-
-      const events = task.historyEvents;
-      const lastEvent = Array.isArray(events) && events.length > 0 ? events[events.length - 1] : null;
-      const dedupKey = `loop:${teamName}:${taskId}:${lastEvent?.timestamp ?? 'none'}`;
-      if (this.loopRestartDedup.has(dedupKey)) return;
-      this.loopRestartDedup.add(dedupKey);
-      if (this.loopRestartDedup.size > 500) {
-        const first = this.loopRestartDedup.values().next().value!;
-        this.loopRestartDedup.delete(first);
-      }
-
-      const controller = this.getController(teamName);
-      controller.tasks.updateTask(taskId, (t: Record<string, unknown>) => {
-        t.loopCurrentIteration = currentIteration + 1;
-        return t;
-      });
-      controller.tasks.setTaskStatus(taskId, 'pending', 'system');
-
-      await this.startTaskByUser(teamName, taskId);
-      logger.info(
-        `[TeamDataService] Loop restart: team=${teamName} task=${taskId} iteration=${currentIteration + 1}`
-      );
-    } catch (error) {
-      logger.warn(`[TeamDataService] maybeRestartLoopTask failed: ${String(error)}`);
-    }
-  }
-
-  async stopTaskLoop(teamName: string, taskId: string): Promise<void> {
-    this.getController(teamName).tasks.updateTask(taskId, (t: Record<string, unknown>) => {
-      t.loopStoppedByUser = true;
-      return t;
-    });
   }
 
   /**

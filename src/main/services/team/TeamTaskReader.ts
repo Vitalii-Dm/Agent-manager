@@ -312,19 +312,6 @@ export class TeamTaskReader {
             typeof (parsed.sourceMessage as Record<string, unknown>).timestamp === 'string'
               ? (parsed.sourceMessage as SourceMessageSnapshot)
               : undefined,
-          loopEnabled: parsed.loopEnabled === true ? true : undefined,
-          loopMaxIterations:
-            typeof parsed.loopMaxIterations === 'number' &&
-            Number.isFinite(parsed.loopMaxIterations) &&
-            parsed.loopMaxIterations > 0
-              ? parsed.loopMaxIterations
-              : undefined,
-          loopCurrentIteration:
-            typeof parsed.loopCurrentIteration === 'number' &&
-            Number.isFinite(parsed.loopCurrentIteration)
-              ? parsed.loopCurrentIteration
-              : undefined,
-          loopStoppedByUser: parsed.loopStoppedByUser === true ? true : undefined,
         } satisfies Record<keyof TeamTask, unknown>;
         if (task.status === 'deleted') {
           continue;

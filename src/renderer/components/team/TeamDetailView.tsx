@@ -1733,9 +1733,7 @@ export const TeamDetailView = ({
     prompt?: string,
     startImmediately?: boolean,
     descriptionTaskRefs?: TaskRef[],
-    promptTaskRefs?: TaskRef[],
-    loopEnabled?: boolean,
-    loopMaxIterations?: number
+    promptTaskRefs?: TaskRef[]
   ): void => {
     setCreatingTask(true);
     void (async () => {
@@ -1750,8 +1748,6 @@ export const TeamDetailView = ({
           descriptionTaskRefs,
           promptTaskRefs,
           startImmediately,
-          loopEnabled,
-          loopMaxIterations,
         });
 
         if (prompt && owner && data?.isAlive && !isTeamProvisioning && startImmediately !== false) {
