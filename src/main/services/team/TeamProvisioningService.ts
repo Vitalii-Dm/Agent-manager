@@ -12248,16 +12248,21 @@ export class TeamProvisioningService {
     );
 
     const combinedOutput = buildCombinedLogs(result.stdout, result.stderr).trim();
-    if (result.exitCode !== 0) {
-      throw new Error(this.buildAgentTeamsMcpValidationError(combinedOutput));
-    }
-
     const normalizedOutput = combinedOutput.toLowerCase();
-    if (
-      !normalizedOutput.includes('status: ✓ connected') &&
-      !normalizedOutput.includes('status: connected')
-    ) {
-      throw new Error(this.buildAgentTeamsMcpValidationError(combinedOutput));
+    const connected =
+      result.exitCode === 0 &&
+      (normalizedOutput.includes('status: ✓ connected') ||
+        normalizedOutput.includes('status: connected'));
+
+    if (!connected) {
+      // Newer Claude CLIs (2.x) read `mcp get` from .mcp.json only and ignore
+      // --mcp-config, so this probe cannot succeed via the bootstrap config.
+      // Team coordination tools (TeamCreate, TaskCreate, SendMessage, etc.) are
+      // built into Claude's Agent Teams feature, not into this MCP server, so
+      // launch is allowed to proceed without the agent-teams MCP.
+      logger.warn(
+        `agent-teams MCP probe did not report connected; continuing launch without it.\n${combinedOutput}`
+      );
     }
   }
 

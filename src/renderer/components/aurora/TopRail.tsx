@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
+import { InsightsBadge } from './InsightsBadge';
 import { LiquidGlass } from './LiquidGlass';
 import { useAuroraTeam } from './hooks/useAuroraTeam';
 
@@ -95,6 +96,7 @@ export const TopRail = (): React.JSX.Element => {
             </svg>
           </button>
           <span className="mx-1 h-4 w-px bg-[color:var(--glass-shade)]" aria-hidden="true" />
+          <InsightsBadge />
         </div>
 
         <span className="flex items-center gap-2.5 whitespace-nowrap text-[12px] text-[color:var(--ink-2)]">

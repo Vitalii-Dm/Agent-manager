@@ -315,7 +315,7 @@ const DEFAULT_CONFIG: AppConfig = {
     showDockIcon: true,
     theme: 'dark',
     defaultTab: 'dashboard',
-    multimodelEnabled: true,
+    multimodelEnabled: false,
     claudeRootPath: null,
     agentLanguage: 'system',
     autoExpandAIGroups: false,

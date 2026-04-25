@@ -69,7 +69,10 @@ export const KanbanGlass = ({
   const { members, teamName } = useAuroraTeam();
   const realTasks = useStore((s) => s.selectedTeamData?.tasks ?? []);
   const updateKanban = useStore((s) => s.updateKanban);
-  const [overrides, setOverrides] = useState<Record<string, ColumnId>>({});
+  const overridesStorageKey = teamName ? `aurora.kanban.overrides.${teamName}` : null;
+  const [overrides, setOverrides] = useState<Record<string, ColumnId>>(() =>
+    loadOverridesFromStorage(overridesStorageKey)
+  );
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -77,11 +80,18 @@ export const KanbanGlass = ({
     useSensor(KeyboardSensor)
   );
 
-  // Reset overrides when the underlying task set changes — keeps the surface
-  // honest if the team's kanban refreshes from disk.
   useEffect(() => {
-    setOverrides({});
-  }, [realTasks.length]);
+    setOverrides(loadOverridesFromStorage(overridesStorageKey));
+  }, [overridesStorageKey]);
+
+  useEffect(() => {
+    if (!overridesStorageKey) return;
+    try {
+      sessionStorage.setItem(overridesStorageKey, JSON.stringify(overrides));
+    } catch {
+      // sessionStorage may be unavailable in some Electron contexts; ignore.
+    }
+  }, [overrides, overridesStorageKey]);
 
   const grouped = useMemo<Record<ColumnId, CardItem[]>>(() => {
     const acc: Record<ColumnId, CardItem[]> = { todo: [], in_progress: [], review: [], done: [] };
@@ -436,6 +446,23 @@ const GraphView = (): React.JSX.Element => (
 
 function isColumnId(value: string): value is ColumnId {
   return value === 'todo' || value === 'in_progress' || value === 'review' || value === 'done';
+}
+
+function loadOverridesFromStorage(key: string | null): Record<string, ColumnId> {
+  if (!key) return {};
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    const out: Record<string, ColumnId> = {};
+    for (const [taskId, col] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof col === 'string' && isColumnId(col)) out[taskId] = col;
+    }
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 function mapTaskToColumn(task: TeamTaskWithKanban): ColumnId {

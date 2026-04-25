@@ -193,20 +193,65 @@ interface ValidationResult {
 
 import { CUSTOM_ROLE, PRESET_ROLES } from '@renderer/constants/teamRoles';
 
-const DEFAULT_MEMBERS: { name: string; roleSelection: string; workflow?: string }[] = [
+type TeamTemplateMember = { name: string; roleSelection: string; workflow?: string };
+
+interface TeamTemplate {
+  id: 'engineering' | 'design-eng' | 'solo';
+  label: string;
+  description: string;
+  members: TeamTemplateMember[];
+}
+
+const TEAM_TEMPLATES: TeamTemplate[] = [
   {
-    name: 'alice',
-    roleSelection: 'reviewer',
-    workflow:
-      'Review every completed task in the project. Read the code changes, check for correctness, style, and potential issues. Approve the task or request changes with clear feedback.',
+    id: 'engineering',
+    label: 'Engineering',
+    description: 'Reviewer + 3 developers, ready to ship features in parallel.',
+    members: [
+      {
+        name: 'alice',
+        roleSelection: 'reviewer',
+        workflow:
+          'Review every completed task in the project. Read the code changes, check for correctness, style, and potential issues. Approve the task or request changes with clear feedback.',
+      },
+      { name: 'tom', roleSelection: 'developer' },
+      { name: 'bob', roleSelection: 'developer' },
+      { name: 'jack', roleSelection: 'developer' },
+    ],
   },
   {
-    name: 'tom',
-    roleSelection: 'developer',
+    id: 'design-eng',
+    label: 'Design + Eng',
+    description: 'Designer pairs with two developers and a reviewer.',
+    members: [
+      {
+        name: 'maya',
+        roleSelection: 'designer',
+        workflow:
+          'Translate product requirements into clear UI specs. Hand off mockups and rationales to developers, then review the rendered result.',
+      },
+      { name: 'leo', roleSelection: 'developer' },
+      { name: 'iris', roleSelection: 'developer' },
+      {
+        name: 'noor',
+        roleSelection: 'reviewer',
+        workflow:
+          'Review every completed task: check correctness, accessibility, and visual fidelity against the designer’s spec.',
+      },
+    ],
   },
-  { name: 'bob', roleSelection: 'developer' },
-  { name: 'jack', roleSelection: 'developer' },
+  {
+    id: 'solo',
+    label: 'Solo',
+    description: 'One agent, manages its own task list. Easiest to demo.',
+    members: [],
+  },
 ];
+
+const DEFAULT_TEMPLATE_ID: TeamTemplate['id'] = 'engineering';
+
+const DEFAULT_MEMBERS: TeamTemplateMember[] =
+  TEAM_TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE_ID)?.members ?? [];
 
 /** Mirrors Claude CLI's `zuA()` sanitization: non-alphanumeric → `-`, then lowercase. */
 function sanitizeTeamName(name: string): string {
@@ -348,6 +393,8 @@ export const CreateTeamDialog = ({
   const promptChipDraft = useChipDraftPersistence('createTeam:prompt:chips');
 
   // ── Transient UI state (NOT persisted) ───────────────────────────────
+  const [selectedTemplateId, setSelectedTemplateId] =
+    useState<TeamTemplate['id']>(DEFAULT_TEMPLATE_ID);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -1030,7 +1077,7 @@ export const CreateTeamDialog = ({
         }
       }}
     >
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle className="text-sm">{initialData ? 'Copy Team' : 'Create Team'}</DialogTitle>
           <DialogDescription className="text-xs">
@@ -1039,6 +1086,54 @@ export const CreateTeamDialog = ({
               : 'Team provisioning via local Claude CLI.'}
           </DialogDescription>
         </DialogHeader>
+
+        {!initialData ? (
+          <div className="space-y-1.5">
+            <Label className="text-muted-foreground text-[11px] uppercase tracking-[0.18em]">
+              Template
+            </Label>
+            <div className="grid grid-cols-3 gap-2">
+              {TEAM_TEMPLATES.map((template) => {
+                const active = selectedTemplateId === template.id;
+                return (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTemplateId(template.id);
+                      if (template.id === 'solo') {
+                        setSoloTeam(true);
+                        setMembers([]);
+                      } else {
+                        setSoloTeam(false);
+                        setMembers(
+                          template.members.map((member) =>
+                            createMemberDraft({
+                              name: member.name,
+                              roleSelection: member.roleSelection,
+                              workflow: member.workflow,
+                            })
+                          )
+                        );
+                      }
+                    }}
+                    className={cn(
+                      'flex h-full flex-col items-start gap-1 rounded-md border p-2 text-left text-xs transition-colors',
+                      active
+                        ? 'bg-[color:var(--accent)]/40 border-[color:var(--ring)]'
+                        : 'hover:bg-[color:var(--accent)]/15 border-[color:var(--border)]'
+                    )}
+                  >
+                    <span className="text-[12px] font-medium">{template.label}</span>
+                    <span className="text-[10.5px] leading-snug opacity-70">
+                      {template.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {conflictingTeam && !conflictDismissed ? (
           <div
