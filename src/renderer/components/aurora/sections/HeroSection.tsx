@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } fr
 
 import { scrollToAnchor } from '@renderer/lib/lenis';
 import { useStore } from '@renderer/store';
+import { isDemoTeamName } from '@renderer/utils/demoTeamFixture';
 import type { TeamSummary } from '@shared/types/team';
 
 import { LiquidGlass } from '../LiquidGlass';
@@ -92,6 +93,7 @@ export const HeroSection = (): React.JSX.Element => {
           className="mt-10 flex flex-wrap items-center gap-3"
         >
           <PrimaryCta teams={teams} onSelectTeam={selectTeam} />
+          <DemoTeamCta />
           <SecondaryCta />
         </motion.div>
 
@@ -299,6 +301,30 @@ const PrimaryCta = ({ teams, onSelectTeam }: PrimaryCtaProps): React.JSX.Element
         )}
       </AnimatePresence>
     </div>
+  );
+};
+
+const DemoTeamCta = (): React.JSX.Element | null => {
+  const seedDemoTeam = useStore((s) => s.seedDemoTeam);
+  const selectedTeamName = useStore((s) => s.selectedTeamName);
+  if (isDemoTeamName(selectedTeamName)) return null;
+  return (
+    <LiquidGlass
+      as="button"
+      radius={999}
+      refract={false}
+      onClick={() => {
+        seedDemoTeam();
+        scrollToAnchor('#dashboard');
+      }}
+      className="inline-flex h-12 items-center gap-2 px-5 text-[13px] font-medium text-[color:var(--ink-1)] transition-transform duration-300 hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg-base)]"
+    >
+      <span aria-hidden="true">✨</span>
+      <span>Try demo team</span>
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-3)]">
+        no auth
+      </span>
+    </LiquidGlass>
   );
 };
 

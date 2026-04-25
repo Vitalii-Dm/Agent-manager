@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
+import { useStore } from '@renderer/store';
+
 import { InsightsBadge } from './InsightsBadge';
 import { LiquidGlass } from './LiquidGlass';
 import { useAuroraTeam } from './hooks/useAuroraTeam';
@@ -12,6 +14,7 @@ const SHRINK_AT = 80;
 // element lives outside any scrollable container at this stage.
 export const TopRail = (): React.JSX.Element => {
   const { teamName, runningCount, totalCount, isAlive } = useAuroraTeam();
+  const isDemo = useStore((s) => Boolean(s.selectedTeamData?.isDemo));
   const [shrunk, setShrunk] = useState(false);
 
   useEffect(() => {
@@ -99,18 +102,28 @@ export const TopRail = (): React.JSX.Element => {
           <InsightsBadge />
         </div>
 
-        <span className="flex items-center gap-2.5 whitespace-nowrap text-[12px] text-[color:var(--ink-2)]">
+        {isDemo ? (
           <span
-            className={
-              'inline-flex h-2 w-2 rounded-full ' +
-              (isAlive
-                ? 'bg-[color:var(--ok)] shadow-[0_0_0_4px_rgba(46,204,113,0.18)]'
-                : 'bg-[color:var(--ink-4)]')
-            }
-            aria-hidden="true"
-          />
-          <span className="font-mono text-[11px] uppercase tracking-[0.1em]">{statusLabel}</span>
-        </span>
+            className="border-[color:var(--a-violet)]/40 bg-[color:var(--a-violet)]/15 flex items-center gap-2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium text-[color:var(--a-violet)]"
+            title="Demo team — no live agents, all data is fixture"
+          >
+            <span aria-hidden="true">✨</span>
+            <span className="font-mono uppercase tracking-[0.14em]">Demo · fake data</span>
+          </span>
+        ) : (
+          <span className="flex items-center gap-2.5 whitespace-nowrap text-[12px] text-[color:var(--ink-2)]">
+            <span
+              className={
+                'inline-flex h-2 w-2 rounded-full ' +
+                (isAlive
+                  ? 'bg-[color:var(--ok)] shadow-[0_0_0_4px_rgba(46,204,113,0.18)]'
+                  : 'bg-[color:var(--ink-4)]')
+              }
+              aria-hidden="true"
+            />
+            <span className="font-mono text-[11px] uppercase tracking-[0.1em]">{statusLabel}</span>
+          </span>
+        )}
       </LiquidGlass>
     </div>
   );

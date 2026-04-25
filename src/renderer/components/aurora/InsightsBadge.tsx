@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import { api } from '@renderer/api';
 import { useStore } from '@renderer/store';
+import { getDemoMemberStats, isDemoTeamName } from '@renderer/utils/demoTeamFixture';
 import { formatTokensCompact } from '@shared/utils/tokenFormatting';
 
 import type { MemberFullStats } from '@shared/types';
@@ -58,10 +59,15 @@ export const InsightsBadge = (): React.JSX.Element | null => {
     }
 
     let cancelled = false;
+    const isDemo = isDemoTeamName(teamName);
     const load = async (): Promise<void> => {
       try {
         const results = await Promise.all(
           members.map(async (m) => {
+            if (isDemo) {
+              const fixture = getDemoMemberStats(m.name);
+              return fixture ? { name: m.name, stats: fixture } : null;
+            }
             try {
               const s = await api.teams.getMemberStats(teamName, m.name);
               return { name: m.name, stats: s };
@@ -227,6 +233,13 @@ export const InsightsBadge = (): React.JSX.Element | null => {
     window.addEventListener('mousedown', onDown);
     return () => window.removeEventListener('mousedown', onDown);
   }, [open]);
+
+  // CommandBar can request the popover be opened directly.
+  useEffect(() => {
+    const handler = (): void => setOpen(true);
+    window.addEventListener('aurora:open-insights', handler);
+    return () => window.removeEventListener('aurora:open-insights', handler);
+  }, []);
 
   if (!teamName) return null;
 

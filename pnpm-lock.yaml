@@ -441,6 +441,8 @@ importers:
 
   agent-teams-controller: {}
 
+  mcp-server: {}
+
   packages/agent-graph:
     dependencies:
       d3-force:

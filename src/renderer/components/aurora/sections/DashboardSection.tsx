@@ -110,13 +110,37 @@ export const DashboardSection = (): React.JSX.Element => {
   useEffect(() => {
     const onCreateTeam = (): void => setCreateTeamOpen(true);
     const onCreateTask = (): void => setCreateTaskOpen(true);
+    const onLaunchTeam = (): void => setLaunchDialogOpen(true);
+    const onOpenTrash = (): void => {
+      if (teamName) setTrashOpen(true);
+    };
+    const onSetFilter = (e: Event): void => {
+      const detail = (e as CustomEvent<unknown>).detail;
+      if (typeof detail === 'string' && (FILTER_CHIPS as readonly string[]).includes(detail)) {
+        setFilter(detail as FilterChip);
+      }
+    };
+    const onSetView = (e: Event): void => {
+      const detail = (e as CustomEvent<unknown>).detail;
+      if (typeof detail === 'string' && (VIEW_TABS as readonly string[]).includes(detail)) {
+        setView(detail as ViewTab);
+      }
+    };
     window.addEventListener('aurora:create-team', onCreateTeam);
     window.addEventListener('aurora:create-task', onCreateTask);
+    window.addEventListener('aurora:launch-team', onLaunchTeam);
+    window.addEventListener('aurora:open-trash', onOpenTrash);
+    window.addEventListener('aurora:set-filter', onSetFilter as EventListener);
+    window.addEventListener('aurora:set-view', onSetView as EventListener);
     return () => {
       window.removeEventListener('aurora:create-team', onCreateTeam);
       window.removeEventListener('aurora:create-task', onCreateTask);
+      window.removeEventListener('aurora:launch-team', onLaunchTeam);
+      window.removeEventListener('aurora:open-trash', onOpenTrash);
+      window.removeEventListener('aurora:set-filter', onSetFilter as EventListener);
+      window.removeEventListener('aurora:set-view', onSetView as EventListener);
     };
-  }, []);
+  }, [teamName]);
 
   const electronMode = isElectronMode();
   const canCreate = electronMode && connectionMode === 'local';

@@ -1,4 +1,9 @@
 import { api } from '@renderer/api';
+import {
+  DEMO_TEAM_NAME,
+  buildDemoTeamData,
+  buildDemoTeamSummary,
+} from '@renderer/utils/demoTeamFixture';
 import { normalizePath } from '@renderer/utils/pathNormalize';
 import {
   buildTaskChangePresenceKey,
@@ -50,6 +55,7 @@ import type {
   TeamSummary,
   TeamTask,
   TeamTaskStatus,
+  TeamTaskWithKanban,
   ToolApprovalRequest,
   ToolApprovalSettings,
   UpdateKanbanPatch,
@@ -1356,6 +1362,12 @@ export interface TeamSlice {
   setMessagesPanelMode: (mode: TeamMessagesPanelMode) => void;
   setMessagesPanelWidth: (width: number) => void;
   setSidebarLogsHeight: (height: number) => void;
+
+  // Demo team — renderer-only fixture seeding for the hackathon walkthrough.
+  // Never persisted, never round-tripped through IPC.
+  seedDemoTeam: () => void;
+  appendDemoTask: (task: TeamTaskWithKanban) => void;
+  appendDemoMessage: (message: InboxMessage) => void;
 }
 
 // --- Per-team launch params persistence ---
@@ -1640,6 +1652,47 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
   setMessagesPanelMode: (mode: TeamMessagesPanelMode) => set({ messagesPanelMode: mode }),
   setMessagesPanelWidth: (width: number) => set({ messagesPanelWidth: width }),
   setSidebarLogsHeight: (height: number) => set({ sidebarLogsHeight: height }),
+
+  seedDemoTeam: () => {
+    const teamData = buildDemoTeamData();
+    const summary = buildDemoTeamSummary();
+    set((state) => {
+      const teamsWithoutDemo = state.teams.filter((t) => t.teamName !== summary.teamName);
+      return {
+        teams: [...teamsWithoutDemo, summary],
+        teamByName: { ...state.teamByName, [summary.teamName]: summary },
+        teamDataCacheByName: { ...state.teamDataCacheByName, [teamData.teamName]: teamData },
+        selectedTeamName: teamData.teamName,
+        selectedTeamData: teamData,
+        selectedTeamLoading: false,
+        selectedTeamError: null,
+      };
+    });
+  },
+
+  appendDemoTask: (task) => {
+    set((state) => {
+      const current = state.selectedTeamData;
+      if (!current?.isDemo) return state;
+      const next: TeamData = { ...current, tasks: [...current.tasks, task] };
+      return {
+        selectedTeamData: next,
+        teamDataCacheByName: { ...state.teamDataCacheByName, [current.teamName]: next },
+      };
+    });
+  },
+
+  appendDemoMessage: (message) => {
+    set((state) => {
+      const current = state.selectedTeamData;
+      if (!current?.isDemo) return state;
+      const next: TeamData = { ...current, messages: [...current.messages, message] };
+      return {
+        selectedTeamData: next,
+        teamDataCacheByName: { ...state.teamDataCacheByName, [current.teamName]: next },
+      };
+    });
+  },
 
   fetchBranches: async (paths: string[]) => {
     const entries = await Promise.all(
@@ -2689,6 +2742,40 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
   },
 
   sendTeamMessage: async (teamName: string, request: SendMessageRequest) => {
+    // Demo team — append the message in-memory and synthesize an agent reply.
+    // No IPC: there is no backing CLI process for the fixture team.
+    if (teamName === DEMO_TEAM_NAME) {
+      const messageId = `demo-msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const userMessage: InboxMessage = {
+        from: request.from ?? 'user',
+        to: request.to ?? request.member,
+        text: request.text,
+        timestamp: nowIso(),
+        read: true,
+        source: request.source ?? 'user_sent',
+        messageId,
+      };
+      get().appendDemoMessage(userMessage);
+      window.setTimeout(() => {
+        const reply: InboxMessage = {
+          from: request.member,
+          to: 'user',
+          text: `[demo] ${request.member} got your message — fixture team has no live agent to respond.`,
+          timestamp: nowIso(),
+          read: false,
+          source: 'inbox',
+          messageId: `${messageId}-reply`,
+        };
+        get().appendDemoMessage(reply);
+      }, 600);
+      set({
+        sendingMessage: false,
+        sendMessageError: null,
+        lastSendMessageResult: { messageId, deliveredToInbox: true },
+      });
+      return;
+    }
+
     set({ sendingMessage: true, sendMessageError: null, lastSendMessageResult: null });
     try {
       const result = await unwrapIpc('team:sendMessage', () =>
@@ -2796,6 +2883,29 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
   },
 
   createTeamTask: async (teamName: string, request: CreateTaskRequest) => {
+    if (teamName === DEMO_TEAM_NAME) {
+      const id = `demo-task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const now = nowIso();
+      const task: TeamTaskWithKanban = {
+        id,
+        displayId: `T-${id.slice(-4).toUpperCase()}`,
+        subject: request.subject,
+        description: request.description,
+        owner: request.owner,
+        createdBy: 'user',
+        status: 'pending',
+        blockedBy: request.blockedBy,
+        related: request.related,
+        prompt: request.prompt,
+        descriptionTaskRefs: request.descriptionTaskRefs,
+        promptTaskRefs: request.promptTaskRefs,
+        createdAt: now,
+        updatedAt: now,
+      };
+      get().appendDemoTask(task);
+      return task;
+    }
+
     const task = await unwrapIpc('team:createTask', () => api.teams.createTask(teamName, request));
     await get().refreshTeamData(teamName);
     return task;

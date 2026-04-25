@@ -3,18 +3,25 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Command } from 'cmdk';
 
 import { scrollToAnchor } from '@renderer/lib/lenis';
+import { useStore } from '@renderer/store';
+import { isDemoTeamName } from '@renderer/utils/demoTeamFixture';
 
 import { LiquidGlass } from './LiquidGlass';
 import { Mascot, inferMascotRole } from './Mascot';
 import { useAuroraTeam } from './hooks/useAuroraTeam';
 
+type CommandGroup = 'Navigate' | 'Teams' | 'Tasks' | 'View' | 'Agents' | 'System';
+
 interface CommandAction {
   id: string;
   label: string;
   hint?: string;
-  group: 'Navigate' | 'Agents' | 'System';
+  group: CommandGroup;
   perform: () => void;
 }
+
+const FILTER_LABELS = ['All', 'In progress', 'Review', 'Blocked'] as const;
+const VIEW_LABELS = ['Kanban', 'List', 'Graph'] as const;
 
 const APPLE_EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -24,7 +31,9 @@ export const CommandBar = (): React.JSX.Element => {
   const [open, setOpen] = useState(false);
   const [showPill, setShowPill] = useState(false);
   const reduceMotion = useReducedMotion();
-  const { members } = useAuroraTeam();
+  const { members, teamName } = useAuroraTeam();
+  const seedDemoTeam = useStore((s) => s.seedDemoTeam);
+  const isDemoActive = isDemoTeamName(teamName);
 
   // Hotkey + custom-event open trigger (used by the hero secondary CTA)
   useEffect(() => {
@@ -66,8 +75,13 @@ export const CommandBar = (): React.JSX.Element => {
     scrollToAnchor(anchor);
   }, []);
 
-  const actions = useMemo<CommandAction[]>(
-    () => [
+  const dispatchAndClose = useCallback((event: Event) => {
+    setOpen(false);
+    window.dispatchEvent(event);
+  }, []);
+
+  const actions = useMemo<CommandAction[]>(() => {
+    const list: CommandAction[] = [
       {
         id: 'go-home',
         label: 'Go to home',
@@ -90,45 +104,111 @@ export const CommandBar = (): React.JSX.Element => {
         perform: () => navigate('#graph'),
       },
       {
-        id: 'create-agent',
-        label: 'Create a new agent',
-        group: 'Agents',
+        id: 'team-create',
+        label: 'Create new team',
+        group: 'Teams',
+        perform: () => dispatchAndClose(new CustomEvent('aurora:create-team')),
+      },
+    ];
+
+    if (teamName) {
+      list.push({
+        id: 'team-launch',
+        label: 'Launch team',
+        group: 'Teams',
+        hint: teamName,
+        perform: () => dispatchAndClose(new CustomEvent('aurora:launch-team')),
+      });
+    }
+
+    if (!isDemoActive) {
+      list.push({
+        id: 'team-demo',
+        label: 'Try demo team',
+        group: 'Teams',
+        hint: 'no auth needed',
         perform: () => {
           setOpen(false);
-          window.dispatchEvent(new CustomEvent('aurora:create-team'));
+          seedDemoTeam();
+          scrollToAnchor('#dashboard');
         },
-      },
-      {
-        id: 'message-lead',
-        label: 'Message the lead',
+      });
+    }
+
+    list.push({
+      id: 'task-create',
+      label: 'Create new task',
+      group: 'Tasks',
+      hint: teamName ?? 'no team',
+      perform: () => dispatchAndClose(new CustomEvent('aurora:create-task')),
+    });
+
+    if (teamName) {
+      list.push({
+        id: 'task-trash',
+        label: 'Open trash',
+        group: 'Tasks',
+        perform: () => dispatchAndClose(new CustomEvent('aurora:open-trash')),
+      });
+    }
+
+    for (const filter of FILTER_LABELS) {
+      list.push({
+        id: `filter-${filter}`,
+        label: `Filter · ${filter}`,
+        group: 'Tasks',
+        perform: () => dispatchAndClose(new CustomEvent('aurora:set-filter', { detail: filter })),
+      });
+    }
+
+    for (const view of VIEW_LABELS) {
+      list.push({
+        id: `view-${view}`,
+        label: `Switch view · ${view}`,
+        group: 'View',
+        perform: () => dispatchAndClose(new CustomEvent('aurora:set-view', { detail: view })),
+      });
+    }
+
+    if (members.length === 0) {
+      list.push({
+        id: 'message-fallback',
+        label: 'Open chat',
         group: 'Agents',
-        perform: () => {
-          setOpen(false);
-          window.dispatchEvent(new CustomEvent('aurora:open-chat'));
-        },
-      },
-      {
-        id: 'message-coder',
-        label: 'Message the coder',
-        group: 'Agents',
-        perform: () => {
-          setOpen(false);
-          window.dispatchEvent(new CustomEvent('aurora:open-chat'));
-        },
-      },
-      {
-        id: 'message-reviewer',
-        label: 'Message the reviewer',
-        group: 'Agents',
-        perform: () => {
-          setOpen(false);
-          window.dispatchEvent(new CustomEvent('aurora:open-chat'));
-        },
-      },
-      { id: 'toggle-theme', label: 'Toggle theme', group: 'System', perform: toggleTheme },
-    ],
-    [navigate]
-  );
+        hint: teamName ?? 'no team',
+        perform: () =>
+          dispatchAndClose(new CustomEvent('aurora:open-chat', { detail: { recipient: 'lead' } })),
+      });
+    } else {
+      for (const member of members) {
+        list.push({
+          id: `message-${member.name}`,
+          label: `Message ${member.name}`,
+          group: 'Agents',
+          hint: member.role ?? member.agentType,
+          perform: () =>
+            dispatchAndClose(
+              new CustomEvent('aurora:open-chat', { detail: { recipient: member.name } })
+            ),
+        });
+      }
+    }
+
+    list.push({
+      id: 'show-insights',
+      label: 'Show context insights',
+      group: 'System',
+      perform: () => dispatchAndClose(new CustomEvent('aurora:open-insights')),
+    });
+    list.push({
+      id: 'toggle-theme',
+      label: 'Toggle theme',
+      group: 'System',
+      perform: toggleTheme,
+    });
+
+    return list;
+  }, [navigate, dispatchAndClose, teamName, isDemoActive, seedDemoTeam, members]);
 
   const recentMascots = members.slice(0, 3);
 
@@ -223,31 +303,33 @@ export const CommandBar = (): React.JSX.Element => {
                       Nothing matches yet — try a different word.
                     </Command.Empty>
 
-                    {(['Navigate', 'Agents', 'System'] as const).map((group) => (
-                      <Command.Group
-                        key={group}
-                        heading={group}
-                        className="px-1 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10.5px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.18em] [&_[cmdk-group-heading]]:text-[color:var(--ink-3)]"
-                      >
-                        {actions
-                          .filter((a) => a.group === group)
-                          .map((action) => (
-                            <Command.Item
-                              key={action.id}
-                              value={`${action.label} ${action.hint ?? ''}`}
-                              onSelect={() => action.perform()}
-                              className="flex cursor-pointer items-center justify-between rounded-[10px] px-3 py-2 text-[13px] text-[color:var(--ink-1)] aria-selected:bg-white/70 aria-selected:shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
-                            >
-                              <span>{action.label}</span>
-                              {action.hint && (
-                                <span className="font-mono text-[11px] text-[color:var(--ink-3)]">
-                                  {action.hint}
-                                </span>
-                              )}
-                            </Command.Item>
-                          ))}
-                      </Command.Group>
-                    ))}
+                    {(['Navigate', 'Teams', 'Tasks', 'View', 'Agents', 'System'] as const).map(
+                      (group) => (
+                        <Command.Group
+                          key={group}
+                          heading={group}
+                          className="px-1 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10.5px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.18em] [&_[cmdk-group-heading]]:text-[color:var(--ink-3)]"
+                        >
+                          {actions
+                            .filter((a) => a.group === group)
+                            .map((action) => (
+                              <Command.Item
+                                key={action.id}
+                                value={`${action.label} ${action.hint ?? ''}`}
+                                onSelect={() => action.perform()}
+                                className="flex cursor-pointer items-center justify-between rounded-[10px] px-3 py-2 text-[13px] text-[color:var(--ink-1)] aria-selected:bg-white/70 aria-selected:shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
+                              >
+                                <span>{action.label}</span>
+                                {action.hint && (
+                                  <span className="font-mono text-[11px] text-[color:var(--ink-3)]">
+                                    {action.hint}
+                                  </span>
+                                )}
+                              </Command.Item>
+                            ))}
+                        </Command.Group>
+                      )
+                    )}
                   </Command.List>
                 </Command>
               </LiquidGlass>

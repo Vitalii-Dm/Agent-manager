@@ -78,6 +78,8 @@ export interface TeamSummary {
   pendingCount?: number;
   failedCount?: number;
   runtimeAlivePendingCount?: number;
+  /** Renderer-only: marks an in-memory fixture team that never round-trips through IPC. */
+  isDemo?: boolean;
 }
 
 export type TeamTaskStatus = 'pending' | 'in_progress' | 'completed' | 'deleted';
@@ -739,6 +741,8 @@ export interface TeamData {
   processes: TeamProcess[];
   warnings?: string[];
   isAlive?: boolean;
+  /** Renderer-only: marks an in-memory fixture team that never round-trips through IPC. */
+  isDemo?: boolean;
 }
 
 export type EffortLevel = 'low' | 'medium' | 'high';

@@ -21,10 +21,15 @@ import { HeroSection } from './sections/HeroSection';
 // ---------------------------------------------------------------------------
 interface AuroraChatPanelProps {
   teamName: string;
+  recipient: string;
   onClose: () => void;
 }
 
-const AuroraChatPanel = ({ teamName, onClose }: AuroraChatPanelProps): React.JSX.Element => {
+const AuroraChatPanel = ({
+  teamName,
+  recipient,
+  onClose,
+}: AuroraChatPanelProps): React.JSX.Element => {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -43,14 +48,14 @@ const AuroraChatPanel = ({ teamName, onClose }: AuroraChatPanelProps): React.JSX
     const trimmed = text.trim();
     if (!trimmed || sendingMessage) return;
     void sendTeamMessage(teamName, {
-      member: 'lead',
+      member: recipient,
       text: trimmed,
       from: 'user',
       source: 'user_sent',
     });
     setText('');
     inputRef.current?.focus();
-  }, [text, sendingMessage, sendTeamMessage, teamName]);
+  }, [text, sendingMessage, sendTeamMessage, teamName, recipient]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -85,7 +90,7 @@ const AuroraChatPanel = ({ teamName, onClose }: AuroraChatPanelProps): React.JSX
             />
           </svg>
           <span className="text-[13px] font-medium text-[color:var(--ink-1)]">
-            Chat · {teamName}
+            Chat · {recipient}
           </span>
         </div>
         <button
@@ -153,7 +158,7 @@ const AuroraChatPanel = ({ teamName, onClose }: AuroraChatPanelProps): React.JSX
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Message lead…"
+          placeholder={`Message ${recipient}…`}
           disabled={sendingMessage}
           className="bg-white/8 min-w-0 flex-1 rounded-full border border-white/10 px-3.5 py-1.5 text-[13px] text-[color:var(--ink-1)] placeholder:text-[color:var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[color:var(--a-violet)] disabled:opacity-50"
         />
@@ -183,6 +188,7 @@ const AuroraChatPanel = ({ teamName, onClose }: AuroraChatPanelProps): React.JSX
 // ---------------------------------------------------------------------------
 export const AuroraShell = (): React.JSX.Element => {
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatRecipient, setChatRecipient] = useState<string>('lead');
   const { teamName } = useAuroraTeam();
 
   useEffect(() => {
@@ -208,8 +214,18 @@ export const AuroraShell = (): React.JSX.Element => {
   }, []);
 
   // Toggle the chat panel when the TopRail chat button fires the custom event.
+  // CommandBar passes a `{ recipient }` payload so the panel pre-targets the right agent.
   useEffect(() => {
-    const handler = (): void => setChatOpen((prev) => !prev);
+    const handler = (event: Event): void => {
+      const detail = (event as CustomEvent<{ recipient?: string }>).detail;
+      const recipient = detail?.recipient?.trim();
+      if (recipient) {
+        setChatRecipient(recipient);
+        setChatOpen(true);
+      } else {
+        setChatOpen((prev) => !prev);
+      }
+    };
     window.addEventListener('aurora:open-chat', handler as EventListener);
     return () => window.removeEventListener('aurora:open-chat', handler as EventListener);
   }, []);
@@ -229,7 +245,11 @@ export const AuroraShell = (): React.JSX.Element => {
       </main>
       <CommandBar />
       {chatOpen && teamName && (
-        <AuroraChatPanel teamName={teamName} onClose={() => setChatOpen(false)} />
+        <AuroraChatPanel
+          teamName={teamName}
+          recipient={chatRecipient}
+          onClose={() => setChatOpen(false)}
+        />
       )}
     </div>
   );
