@@ -82,8 +82,9 @@ interface CardItem {
 // we keep the optimistic local state so the surface is fully interactive in
 // the demo flow.
 export const KanbanGlass = ({ filter, view }: KanbanGlassProps): React.JSX.Element => {
-  const { members } = useAuroraTeam();
+  const { members, teamName } = useAuroraTeam();
   const realTasks = useStore((s) => s.selectedTeamData?.tasks ?? []);
+  const updateKanban = useStore((s) => s.updateKanban);
   const [overrides, setOverrides] = useState<Record<string, ColumnId>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -138,7 +139,19 @@ export const KanbanGlass = ({ filter, view }: KanbanGlassProps): React.JSX.Eleme
         if (!overId) return;
         const target = String(overId);
         if (!isColumnId(target)) return;
-        setOverrides((prev) => ({ ...prev, [String(e.active.id)]: target }));
+        const cardId = String(e.active.id);
+        const isCardSeed = cardId.startsWith('seed-');
+        setOverrides((prev) => ({ ...prev, [cardId]: target }));
+        if (teamName && !isCardSeed) {
+          // Only 'review' and 'approved' (done) are supported by the patch API.
+          // For todo/in_progress the optimistic local override is the best we can do.
+          if (target === 'review') {
+            void updateKanban(teamName, cardId, { op: 'set_column', column: 'review' });
+          } else if (target === 'done') {
+            void updateKanban(teamName, cardId, { op: 'set_column', column: 'approved' });
+          }
+          // TODO: persist via store when patch supports all columns (todo, in_progress)
+        }
       }}
       onDragCancel={() => setActiveId(null)}
     >

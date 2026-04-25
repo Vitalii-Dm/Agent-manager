@@ -150,6 +150,7 @@ const SheenWord = ({ word, delay = 0 }: SheenWordProps): React.JSX.Element => {
 const PrimaryCta = (): React.JSX.Element => (
   <button
     type="button"
+    onClick={() => scrollToAnchor('#dashboard')}
     className="group relative inline-flex h-12 items-center gap-2 overflow-hidden rounded-full px-6 text-[14px] font-medium text-white transition-transform duration-300 will-change-transform hover:-translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg-base)]"
     style={{
       background: 'linear-gradient(135deg, var(--a-violet) 0%, var(--a-cyan) 100%)',

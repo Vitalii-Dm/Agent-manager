@@ -1,7 +1,9 @@
 import React from 'react';
 import { motion } from 'motion/react';
 
-import type { ResolvedTeamMember } from '@shared/types/team';
+import type { ResolvedTeamMember, TeamTaskWithKanban } from '@shared/types/team';
+
+import { useStore } from '@renderer/store';
 
 import { LiquidGlass } from '../LiquidGlass';
 import { Mascot, inferMascotRole, inferMascotStatus, type MascotStatus } from '../Mascot';
@@ -59,8 +61,9 @@ const APPLE_EASE = [0.22, 1, 0.36, 1] as const;
 // opacity so the dashboard never feels broken.
 export const AgentRoster = (): React.JSX.Element => {
   const { members, teamName, totalCount } = useAuroraTeam();
+  const tasks = useStore((s) => s.selectedTeamData?.tasks ?? []);
   const isSeeded = members.length === 0;
-  const cards = isSeeded ? SEED_MEMBERS : members.map(toSeedMember);
+  const cards = isSeeded ? SEED_MEMBERS : members.map((m) => toSeedMember(m, tasks));
 
   return (
     <LiquidGlass radius={26} className="flex flex-col gap-3 p-4">
@@ -181,9 +184,10 @@ const StatusChip = ({ status }: { status: MascotStatus }): React.JSX.Element => 
   </span>
 );
 
-function toSeedMember(member: ResolvedTeamMember): SeedMember {
+function toSeedMember(member: ResolvedTeamMember, tasks: TeamTaskWithKanban[]): SeedMember {
   const status = inferMascotStatus(member.status as unknown as string) ?? 'idle';
   const total = member.taskCount ?? 0;
+  const tasksDone = tasks.filter((t) => t.owner === member.name && t.status === 'completed').length;
   return {
     name: member.name,
     role: member.role ?? member.agentType ?? 'Agent',
@@ -193,10 +197,7 @@ function toSeedMember(member: ResolvedTeamMember): SeedMember {
       : status === 'idle'
         ? 'Awaiting task'
         : 'Working',
-    // taskCount is a total; we don't know completed precisely from the cached
-    // member alone — show 0/N as a conservative snapshot and let the kanban
-    // tell the rich story.
-    tasksDone: 0,
+    tasksDone,
     tasksTotal: total,
   };
 }

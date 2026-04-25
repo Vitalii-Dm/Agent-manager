@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 
 import { destroyLenis, initLenis } from '@renderer/lib/lenis';
+import { initializeNotificationListeners } from '@renderer/store';
 
 import { CommandBar } from './CommandBar';
 import { GlobalBackground } from './GlobalBackground';
@@ -29,6 +30,11 @@ export const AuroraShell = (): React.JSX.Element => {
         delete document.documentElement.dataset.theme;
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = initializeNotificationListeners();
+    return cleanup;
   }, []);
 
   return (

@@ -1,6 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
 
+import { CreateTaskDialog } from '@renderer/components/team/dialogs/CreateTaskDialog';
+import { useStore } from '@renderer/store';
+
+import type { TaskRef } from '@shared/types/team';
+
 import { ActivityStream } from '../dashboard/ActivityStream';
 import { AgentRoster } from '../dashboard/AgentRoster';
 import { KanbanGlass } from '../dashboard/KanbanGlass';
@@ -20,9 +25,13 @@ const APPLE_EASE = [0.22, 1, 0.36, 1] as const;
 // horizontal scrollbar at the document level. Side panels stick to top: 88px
 // once the user scrolls past the header.
 export const DashboardSection = (): React.JSX.Element => {
-  const { teamName, runningCount, totalCount } = useAuroraTeam();
+  const { teamName, members, runningCount, totalCount, isAlive } = useAuroraTeam();
+  const tasks = useStore((s) => s.selectedTeamData?.tasks ?? []);
+  const createTeamTask = useStore((s) => s.createTeamTask);
   const [view, setView] = useState<ViewTab>('Kanban');
   const [filter, setFilter] = useState<FilterChip>('All');
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
   const reduceMotion = useReducedMotion();
   const sectionRef = useRef<HTMLElement | null>(null);
 
@@ -34,52 +43,103 @@ export const DashboardSection = (): React.JSX.Element => {
   const riseScale = useTransform(scrollYProgress, [0, 1], [0.96, 1]);
   const riseOpacity = useTransform(scrollYProgress, [0, 1], [0.4, 1]);
 
+  const handleCreateTask = (
+    subject: string,
+    description: string,
+    owner?: string,
+    blockedBy?: string[],
+    related?: string[],
+    prompt?: string,
+    startImmediately?: boolean,
+    descriptionTaskRefs?: TaskRef[],
+    promptTaskRefs?: TaskRef[]
+  ): void => {
+    if (!teamName) return;
+    setCreatingTask(true);
+    void (async () => {
+      try {
+        await createTeamTask(teamName, {
+          subject,
+          description: description || undefined,
+          owner,
+          blockedBy,
+          related,
+          prompt,
+          descriptionTaskRefs,
+          promptTaskRefs,
+          startImmediately,
+        });
+        setCreateTaskOpen(false);
+      } catch {
+        // error shown via store
+      } finally {
+        setCreatingTask(false);
+      }
+    })();
+  };
+
   return (
-    <section
-      ref={sectionRef}
-      id="dashboard"
-      className="relative px-6 pb-32 pt-24 sm:px-10 lg:px-16"
-      style={{ scrollMarginTop: '88px' }}
-    >
-      <motion.div
-        className="mx-auto w-full max-w-[1480px]"
-        style={
-          reduceMotion
-            ? undefined
-            : { y: riseY, scale: riseScale, opacity: riseOpacity, transformOrigin: 'top center' }
-        }
+    <>
+      <section
+        ref={sectionRef}
+        id="dashboard"
+        className="relative px-6 pb-32 pt-24 sm:px-10 lg:px-16"
+        style={{ scrollMarginTop: '88px' }}
       >
-        <DashboardHeader
-          teamName={teamName}
-          runningCount={runningCount}
-          totalCount={totalCount}
-          view={view}
-          onViewChange={setView}
-          filter={filter}
-          onFilterChange={setFilter}
-        />
-
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.15 }}
-          transition={{ duration: 0.65, ease: APPLE_EASE }}
-          className="mt-10 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)_320px]"
+          className="mx-auto w-full max-w-[1480px]"
+          style={
+            reduceMotion
+              ? undefined
+              : { y: riseY, scale: riseScale, opacity: riseOpacity, transformOrigin: 'top center' }
+          }
         >
-          <div className="lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pr-1">
-            <AgentRoster />
-          </div>
+          <DashboardHeader
+            teamName={teamName}
+            runningCount={runningCount}
+            totalCount={totalCount}
+            view={view}
+            onViewChange={setView}
+            filter={filter}
+            onFilterChange={setFilter}
+            onCreateTask={() => setCreateTaskOpen(true)}
+          />
 
-          <div className="min-w-0">
-            <KanbanGlass filter={filter} view={view} />
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ duration: 0.65, ease: APPLE_EASE }}
+            className="mt-10 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)_320px]"
+          >
+            <div className="lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pr-1">
+              <AgentRoster />
+            </div>
 
-          <div className="lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pl-1">
-            <ActivityStream />
-          </div>
+            <div className="min-w-0">
+              <KanbanGlass filter={filter} view={view} />
+            </div>
+
+            <div className="lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pl-1">
+              <ActivityStream />
+            </div>
+          </motion.div>
         </motion.div>
-      </motion.div>
-    </section>
+      </section>
+
+      {teamName ? (
+        <CreateTaskDialog
+          open={createTaskOpen}
+          teamName={teamName}
+          members={members}
+          tasks={tasks}
+          isTeamAlive={isAlive}
+          onClose={() => setCreateTaskOpen(false)}
+          onSubmit={handleCreateTask}
+          submitting={creatingTask}
+        />
+      ) : null}
+    </>
   );
 };
 
@@ -91,6 +151,7 @@ interface DashboardHeaderProps {
   onViewChange: (v: ViewTab) => void;
   filter: FilterChip;
   onFilterChange: (f: FilterChip) => void;
+  onCreateTask: () => void;
 }
 
 const DashboardHeader = ({
@@ -101,6 +162,7 @@ const DashboardHeader = ({
   onViewChange,
   filter,
   onFilterChange,
+  onCreateTask,
 }: DashboardHeaderProps): React.JSX.Element => (
   <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
     <div className="min-w-0">
@@ -127,6 +189,18 @@ const DashboardHeader = ({
     <div className="flex flex-wrap items-center gap-3">
       <FilterChips value={filter} onChange={onFilterChange} />
       <ViewTabs value={view} onChange={onViewChange} />
+      <button
+        type="button"
+        onClick={onCreateTask}
+        className="inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[12px] font-medium text-white transition-transform duration-300 hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--a-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg-base)]"
+        style={{
+          background: 'linear-gradient(135deg, var(--a-violet) 0%, var(--a-cyan) 100%)',
+          boxShadow: '0 8px 22px -10px rgba(124, 92, 255, 0.5)',
+        }}
+      >
+        <span aria-hidden="true">+</span>
+        <span>New Task</span>
+      </button>
     </div>
   </div>
 );
